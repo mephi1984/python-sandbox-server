@@ -19,6 +19,7 @@ const signPayload = (payload: any): string => {
     
     // Проверяем, что клиентский модуль HMAC корректно принимает строку и кодирует ее в UTF-8
     const hmac = CryptoJS.HmacSHA256(payloadJsonStr, HMAC_SECRET_KEY);
+
     return hmac.toString(CryptoJS.enc.Hex);
 };
 
@@ -180,9 +181,9 @@ export const useClientSandbox = (handleOutput: (data: string) => void) => {
             };
             const signature = signPayload(runPayload);
 
-            const payloadJsonStr = JSON.stringify(runPayload); 
-            console.log("Client Payload String:", payloadJsonStr); // Строка
-            console.log("Client Signature:", signature); // Подпись
+            //const payloadJsonStr = JSON.stringify(runPayload); 
+            //console.log("Client Payload String:", payloadJsonStr); // Строка
+            //console.log("Client Signature:", signature); // Подпись
     
 
             

@@ -12,12 +12,12 @@ from flask_socketio import SocketIO, emit, join_room, leave_room
 from time import sleep
 from dotenv import load_dotenv
 
-
+load_dotenv()
 # --- КОНФИГУРАЦИЯ БЕЗОПАСНОСТИ И DOCKER ---
 IMAGE_NAME = "telegram-sandbox-runner"
 CONTAINER_PREFIX = "sand_cli_" 
 
-SECRET_KEY = os.getenv("HMAC_SECRET_KEY", "fallback_default_key").encode('utf-8') 
+SECRET_KEY = os.getenv("HMAC_SECRET_KEY", "fallback_default_key0000000xxx@").encode('utf-8') 
 if SECRET_KEY == b'fallback_default_key0000000xxx@':
     print("WARNING: Using default SECRET_KEY. Check your .env file!")
 
@@ -45,8 +45,8 @@ def validate_hmac(data: dict, signature: str) -> bool:
     )
     data_bytes = payload_json_str.encode('utf-8')
 
-    print(f"Received data (Bytes): {data_bytes}")
-    print(f"Received signature: {signature}")
+    #print(f"Received data (Bytes): {data_bytes}")
+    #print(f"Received signature: {signature}")
 
 
     expected_hmac = hmac.new(
@@ -55,7 +55,7 @@ def validate_hmac(data: dict, signature: str) -> bool:
         hashlib.sha256
     ).hexdigest()
 
-    print(f"Expected signature: {expected_hmac}")
+    #print(f"Expected signature: {expected_hmac}")
 
     
     return hmac.compare_digest(expected_hmac, signature)
