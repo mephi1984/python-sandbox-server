@@ -3,9 +3,10 @@ import React, { useState, useCallback } from 'react';
 import CodeEditor from './components/CodeEditor'; // Импортируем новый редактор
 import { useClientSandbox } from './hooks/useClientSandbox';
 
+
 const App: React.FC = () => {
     // Начальный код
-    const [code, setCode] = useState('import time\nprint("Hello from sandboxed Python!")\ntime.sleep(5)\nprint("Бот завершил работу.")');
+    const [code, setCode] = useState('print("Hello from Python!")');
     const [output, setOutput] = useState<string>('');
     const [statusMessage, setStatusMessage] = useState<string | null>(null);
     const [isRunning, setIsRunning] = useState(false);
@@ -20,7 +21,8 @@ const App: React.FC = () => {
 
     const handleSubmit = async () => {
         if (clientId === null || !isSocketConnected) {
-            alert('Ошибка: Соединение не готово. Попробуйте обновить страницу.');
+            // NOTE: В React-приложениях лучше использовать кастомный модал вместо alert()
+            console.error('Ошибка: Соединение не готово или клиент не зарегистрирован.');
             return;
         }
 
@@ -42,22 +44,23 @@ const App: React.FC = () => {
     const isReady = !isLoading && isSocketConnected && clientId !== null;
 
     return (
-        // 🌟 Адаптивный контейнер Tailwind
-        <div className="min-h-screen bg-gray-50 p-4 sm:p-6 lg:p-8">
-            <div className="max-w-4xl mx-auto bg-white shadow-xl rounded-xl p-4 sm:p-6">
+        // 1. ТЕМНАЯ ТЕМА: Фон bg-gray-900, основной текст text-gray-100
+        <div className="min-h-screen bg-gray-900 text-gray-100">
+            <div className="max-w-4xl mx-auto bg-gray-800 shadow-xl rounded-xl">
                 
-                <h1 className="text-3xl font-bold text-gray-800 mb-6 border-b pb-2">Python Sandbox (Socket.IO)</h1>
+                <h1 className="text-3xl font-bold text-white mb-6 border-b border-gray-700 p-4 sm:p-6 lg:p-8">Python Sandbox</h1>
                 
-                {/* Блок состояния клиента */}
-                <div className="mb-6 p-4 border border-gray-200 rounded-lg bg-indigo-50/50">
+                <div className="mb-6 p-4 border border-gray-700 rounded-lg bg-gray-700/50">
                     {isLoading ? (
-                        <p className="text-indigo-600 font-medium">⚡️ Установка соединения и регистрация...</p>
+                        <p className="text-indigo-400 font-medium flex items-center">
+                            Установка соединения и регистрация...
+                        </p>
                     ) : error ? (
-                        <p className="text-red-600 font-medium flex items-center">
+                        <p className="text-red-400 font-medium flex items-center">
                             Ошибка: {error}
                         </p>
                     ) : (
-                        <p className="text-green-600 font-medium flex items-center">
+                        <p className="text-green-400 font-medium flex items-center">
                             Соединение активно. Client ID: <strong>{clientId}</strong>
                         </p>
                     )}
@@ -65,10 +68,9 @@ const App: React.FC = () => {
                 
                 {/* Поле для ввода кода */}
                 <div className="mb-4">
-                    <label htmlFor="code-input" className="block text-lg font-semibold text-gray-700 mb-2">
+                    <label htmlFor="code-input" className="block text-lg font-semibold text-gray-300 mb-2">
                         Python-код:
                     </label>
-                    {/* 🌟 Интеграция CodeEditor */}
                     <CodeEditor 
                         value={code}
                         onChange={setCode}
@@ -80,11 +82,12 @@ const App: React.FC = () => {
                 <button
                     onClick={handleSubmit}
                     disabled={!isReady || isRunning}
+                    // 3. СИНЯЯ КНОПКА (bg-blue-600)
                     className={`
                         w-full sm:w-auto px-6 py-3 text-lg font-semibold rounded-lg transition duration-150 shadow-md
                         ${isReady && !isRunning 
-                            ? 'bg-indigo-600 hover:bg-indigo-700 text-white cursor-pointer' 
-                            : 'bg-gray-400 text-gray-700 cursor-not-allowed'}
+                            ? 'bg-blue-600 hover:bg-blue-700 text-white cursor-pointer' 
+                            : 'bg-gray-600 text-gray-400 cursor-not-allowed'}
                     `}
                 >
                     {isRunning ? (
@@ -99,19 +102,22 @@ const App: React.FC = () => {
 
                 {/* Блок вывода статуса */}
                 {statusMessage && (
-                    <div className="mt-6 p-4 rounded-lg border-l-4 border-green-500 bg-green-50">
-                        <p className="font-semibold text-green-700">{statusMessage}</p>
+                    <div className="mt-6 p-4 rounded-lg border-l-4 border-green-500 bg-green-900/50">
+                        <p className="font-semibold text-green-400">{statusMessage}</p>
                     </div>
                 )}
 
                 {/* Блок потокового вывода */}
                 <div className="mt-8">
-                    <p className="text-lg font-semibold text-gray-700 mb-2">Вывод контейнера:</p>
-                    <pre className="bg-gray-800 text-white p-4 rounded-lg overflow-x-auto text-sm" style={{ minHeight: '150px' }}>
-                        {output || (isRunning ? "Ожидание вывода..." : "Нажмите 'Запустить'")}
+                    <p className="text-lg font-semibold text-gray-300 mb-2">Вывод контейнера:</p>
+                    <pre className="bg-gray-900 text-gray-200 p-4 rounded-lg overflow-x-auto text-sm" 
+                         style={{ minHeight: '150px' }}>
+                        {/* ❗ ИСПРАВЛЕНИЕ: Добавлен класс break-all для принудительного переноса длинных слов */}
+                        <span className="whitespace-pre-wrap break-all">
+                            {output || (isRunning ? "Ожидание вывода..." : "Нажмите 'Запустить'")}
+                        </span>
                     </pre>
                 </div>
-
             </div>
         </div>
     );
