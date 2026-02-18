@@ -11,6 +11,7 @@ from flask import Flask, request # <--- Убедитесь, что 'request' з�
 from flask_socketio import SocketIO, emit, join_room, leave_room
 from time import sleep
 from dotenv import load_dotenv
+import bcrypt
 
 load_dotenv()
 # --- КОНФИГУРАЦИЯ БЕЗОПАСНОСТИ И DOCKER ---
@@ -25,6 +26,14 @@ app = Flask(__name__)
 # ВАЖНО: Указываем разрешенные домены для CORS, чтобы SocketIO работал
 # Замените на домен вашего клиента
 socketio = SocketIO(app, cors_allowed_origins="https://code.fishrungames.com") 
+
+# --- ЛОГИН (одна учетная запись, пароль хранится как bcrypt-хеш в .env) ---
+ALLOWED_LOGIN = "yasmina"
+_password_hash_str = os.getenv("PASSWORD_HASH", "").strip()
+PASSWORD_HASH = _password_hash_str.encode("utf-8") if _password_hash_str else b""
+if not PASSWORD_HASH:
+    print("WARNING: PASSWORD_HASH not set in .env. Login will fail.")
+authenticated_sids = set()
 
 # --- ГЛОБАЛЬНОЕ ХРАНИЛИЩЕ ID (Для регистрации и сессии) ---
 client_data = {
@@ -168,19 +177,46 @@ def handle_connect():
 @socketio.on('disconnect')
 def handle_disconnect():
     """Обработка разрыва соединения."""
+    authenticated_sids.discard(request.sid)
     if request.sid in client_data["session_to_client_id"]:
         client_id = client_data["session_to_client_id"][request.sid]
         print(f"Клиент {client_id} отключился.")
         # Удаляем привязку SID, чтобы остановить стриминг
         del client_data["session_to_client_id"][request.sid]
 
+
+@socketio.on('login')
+def handle_login(data):
+    """Проверка логина и пароля. При успехе помечаем сессию как авторизованную."""
+    username = (data.get('username') or '').strip()
+    password = data.get('password') or ''
+    sid = request.sid
+    if username != ALLOWED_LOGIN:
+        emit('login_result', {'status': 'error', 'message': 'Invalid credentials'}, room=sid)
+        return
+    try:
+        if bcrypt.checkpw(password.encode('utf-8'), PASSWORD_HASH):
+            authenticated_sids.add(sid)
+            emit('login_result', {'status': 'success'}, room=sid)
+            print(f"Клиент авторизован: {username} ({sid})")
+        else:
+            emit('login_result', {'status': 'error', 'message': 'Invalid credentials'}, room=sid)
+    except Exception as e:
+        emit('login_result', {'status': 'error', 'message': 'Invalid credentials'}, room=sid)
+
+
 @socketio.on('register_client')
 def handle_register(data):
     """
     Обработка регистрации клиента (новый или существующий ID).
+    Требуется предварительная авторизация через событие login.
     """
     global client_data
-    
+    sid = request.sid
+    if sid not in authenticated_sids:
+        emit('registration_result', {'status': 'error', 'message': 'Not authenticated. Please log in.'}, room=sid)
+        return
+
     # Сначала проверяем, есть ли HMAC подпись в данных
     signature = data.get('signature')
     payload = data.get('payload')
@@ -220,9 +256,13 @@ def handle_register(data):
 def handle_run_script(data):
     """
     Обработка команды на запуск скрипта.
+    Требуется предварительная авторизация и регистрация клиента.
     """
-    # 1. Проверка сессии
     sid = request.sid
+    if sid not in authenticated_sids:
+        emit('execution_result', {'status': 'error', 'message': 'Not authenticated. Please log in.'}, room=sid)
+        return
+    # 1. Проверка сессии
     if sid not in client_data["session_to_client_id"]:
         emit('execution_result', {'status': 'error', 'message': 'Client not registered or session expired.'}, room=sid)
         return

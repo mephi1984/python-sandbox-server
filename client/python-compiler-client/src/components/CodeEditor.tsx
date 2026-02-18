@@ -22,26 +22,19 @@ interface CodeEditorProps {
 const CustomCodeEditor: React.FC<CodeEditorProps> = ({ value, onChange, readOnly }) => {
     return (
         <CodeEditor
-            // Основные пропсы
             value={value}
-            //language="python" // Указываем язык для Prism.js
             placeholder="Введите код Python..."
             readOnly={readOnly}
-            onChange={(e) => onChange(e.target.value)} // onChange принимает объект события
-            
-            // Стили
+            onChange={(e) => onChange(e.target.value)}
+            autoCorrect="off"
+            autoCapitalize="off"
+            spellCheck={false}
             style={{
                 minHeight: "300px",
-                fontSize: '14px', 
+                fontSize: '14px',
                 fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
-                backgroundColor: '#2d2d2d', // Тёмный фон
-                color: '#fff', // Светлый текст
-                // Эти стили унаследованы от textarea, они могут помочь, 
-                // но часто не требуются, т.к. клавиатура их не переопределяет:
-                autocorrect: "off",
-                autocapitalize: "off",
-                spellcheck: "false",
-                inputmode: "text"
+                backgroundColor: '#2d2d2d',
+                color: '#fff',
             }}
         />
     );

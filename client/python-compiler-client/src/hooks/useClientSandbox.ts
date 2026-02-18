@@ -23,40 +23,43 @@ const signPayload = (payload: any): string => {
     return hmac.toString(CryptoJS.enc.Hex);
 };
 
-export const useClientSandbox = (handleOutput: (data: string) => void) => {
+export interface UseClientSandboxOptions {
+    isAuthenticated: boolean;
+}
+
+export const useClientSandbox = (
+    handleOutput: (data: string) => void,
+    options: UseClientSandboxOptions
+) => {
+    const { isAuthenticated } = options;
     const [clientId, setClientId] = useState<number | null>(null);
     const [isSocketConnected, setIsSocketConnected] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     
-    // Референс для хранения объекта Socket.IO
     const socketRef = useRef<Socket | null>(null);
     
-    // --- 1. Управление Соединением и Регистрацией ---
+    // --- Соединение Socket.IO (без регистрации до авторизации) ---
     useEffect(() => {
-        // Устанавливаем соединение Socket.IO
         const socket = io(API_BASE_URL, {
-             // Убедитесь, что URL соответствует вашему API Nginx HTTPS
-             secure: true, 
-             reconnection: true,
-             transports: ['websocket']
+            secure: true,
+            reconnection: true,
+            transports: ['websocket']
         });
 
         socketRef.current = socket;
 
-        // Обработчики событий Socket.IO
         socket.on('connect', () => {
             setIsSocketConnected(true);
             console.log('Socket.IO подключен.');
-            loadOrRegisterClient(socket);
         });
 
         socket.on('disconnect', () => {
             setIsSocketConnected(false);
+            setClientId(null);
             console.log('Socket.IO отключен.');
         });
-        
-        // Обработчик результата регистрации от сервера
+
         socket.on('registration_result', (data: { status: string, message?: string, client_id?: number }) => {
             if (data.status === 'success' && data.client_id) {
                 const newId = data.client_id;
@@ -64,22 +67,50 @@ export const useClientSandbox = (handleOutput: (data: string) => void) => {
                 localStorage.setItem(LOCAL_STORAGE_CLIENT_ID_KEY, String(newId));
                 console.log(`[Client] ID получен/восстановлен: ${newId}`);
             } else {
-                setError(`Ошибка регистрации: ${data.message}`);
+                setError(data.message || 'Ошибка регистрации');
             }
             setIsLoading(false);
         });
 
         socket.on('output', (data: { data: string }) => {
-             handleOutput(data.data); // Вызываем функцию, переданную из App.tsx
+            handleOutput(data.data);
         });
 
-
-        // Очистка при размонтировании
         return () => {
             socket.off('output');
+            socket.off('registration_result');
             socket.disconnect();
         };
     }, [handleOutput]);
+
+    // --- Регистрация клиента только после успешного входа ---
+    useEffect(() => {
+        if (!isAuthenticated || !isSocketConnected) return;
+        const socket = socketRef.current;
+        if (!socket) return;
+        loadOrRegisterClient(socket);
+    }, [isAuthenticated, isSocketConnected]);
+
+    // --- Логин через Socket.IO ---
+    const login = useCallback((username: string, password: string): Promise<{ success: boolean; message?: string }> => {
+        return new Promise((resolve) => {
+            const socket = socketRef.current;
+            if (!socket || !socket.connected) {
+                resolve({ success: false, message: 'Нет соединения с сервером.' });
+                return;
+            }
+            const handler = (data: { status: string; message?: string }) => {
+                socket.off('login_result', handler);
+                if (data.status === 'success') {
+                    resolve({ success: true });
+                } else {
+                    resolve({ success: false, message: data.message || 'Неверный логин или пароль.' });
+                }
+            };
+            socket.once('login_result', handler);
+            socket.emit('login', { username, password });
+        });
+    }, []);
 
     // --- Логика загрузки ID и отправки запроса на регистрацию ---
     const loadOrRegisterClient = (socket: Socket) => {
@@ -122,9 +153,8 @@ export const useClientSandbox = (handleOutput: (data: string) => void) => {
                 const retrySignature = signPayload(retryPayload);
                 const retryMessage: SignedMessage = { payload: retryPayload, signature: retrySignature };
 
-                // Переназначаем слушатель для приема результата повторной регистрации
-                socket.on('registration_result', (data: any) => {
-                    socket.off('registration_result', this); // Удаляем этот слушатель
+                // Один раз слушаем результат повторной регистрации
+                socket.once('registration_result', (data: any) => {
                     if (data.status === 'success' && data.client_id) {
                         setClientId(data.client_id);
                         localStorage.setItem(LOCAL_STORAGE_CLIENT_ID_KEY, String(data.client_id));
@@ -194,5 +224,5 @@ export const useClientSandbox = (handleOutput: (data: string) => void) => {
         });
     }, [clientId, isSocketConnected]);
 
-    return { clientId, isLoading, error, runScript, isSocketConnected };
+    return { clientId, isLoading, error, runScript, isSocketConnected, login };
 };

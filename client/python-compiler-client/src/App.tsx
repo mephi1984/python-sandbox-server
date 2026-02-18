@@ -1,23 +1,42 @@
 import React, { useState, useCallback } from 'react';
-// Предполагается, что вы установили Tailwind CSS
-import CodeEditor from './components/CodeEditor'; // Импортируем новый редактор
+import CodeEditor from './components/CodeEditor';
+import LoginPage from './components/LoginPage';
 import { useClientSandbox } from './hooks/useClientSandbox';
 
-
 const App: React.FC = () => {
-    // Начальный код
+    const [isLoggedIn, setIsLoggedIn] = useState(false);
     const [code, setCode] = useState('print("Hello from Python!")');
     const [output, setOutput] = useState<string>('');
     const [statusMessage, setStatusMessage] = useState<string | null>(null);
     const [isRunning, setIsRunning] = useState(false);
 
-    // Функция для потокового обновления вывода
     const handleOutput = useCallback((data: string) => {
         setOutput(prev => prev + data + '\n');
     }, []);
-    
-    // Передаем handleOutput в хук
-    const { clientId, isLoading, error, runScript, isSocketConnected } = useClientSandbox(handleOutput);
+
+    const { clientId, isLoading, error, runScript, isSocketConnected, login } = useClientSandbox(
+        handleOutput,
+        { isAuthenticated: isLoggedIn }
+    );
+
+    const handleLogin = useCallback(
+        async (credentials: { username: string; password: string }) => {
+            const result = await login(credentials.username, credentials.password);
+            if (result.success) setIsLoggedIn(true);
+            return result;
+        },
+        [login]
+    );
+
+    if (!isLoggedIn) {
+        return (
+            <LoginPage
+                onLogin={handleLogin}
+                isSocketConnected={isSocketConnected}
+                error={error}
+            />
+        );
+    }
 
     const handleSubmit = async () => {
         if (clientId === null || !isSocketConnected) {
